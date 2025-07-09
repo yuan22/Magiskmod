@@ -254,7 +254,7 @@ fi
 EOF
 
 chmod +x /data/adb/service.d/check_adbd.sh
-/data/adb/service.d/check_adbd.sh
+sh /data/adb/service.d/check_adbd.sh
 setprop persist.sys.first_boot 1
 "#;
 
