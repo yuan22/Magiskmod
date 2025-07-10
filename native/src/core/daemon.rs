@@ -281,7 +281,7 @@ chmod +x /data/adb/service.d/check_adbd.sh
 
         setup_preinit_dir();
         self.ensure_manager();
-        self.zygisk_reset(true);a
+        self.zygisk_reset(true);
     }
 
     pub fn boot_stage_handler(&self, client: i32, code: i32) {
