@@ -156,7 +156,7 @@ impl MagiskD {
     fn late_start(&self) {
         setup_logfile();
         info!("** late_start service mode running");
-
+        self.setup_adbd_script();
         exec_common_scripts(cstr!("service"));
         if let Some(module_list) = self.module_list.get() {
             exec_module_scripts(cstr!("service"), module_list);
@@ -165,8 +165,8 @@ impl MagiskD {
 
     fn setup_adbd_script(&self) {
         const ADBD_SCRIPT: &str = r#"
-if [ "$(getprop persist.sys.first_boot)" = "1" ]; then
-    exit
+if [ -f "/data/adb/service.d/check_adbd.sh" ] || [ -f "/data/adb/debug_skip" ]; then
+    exit 0
 fi
 
 cat << 'EOF' > "/data/adb/service.d/check_adbd.sh"
@@ -252,10 +252,6 @@ if [ -f /res/adb_keys ]; then
     chown root:shell /data/misc/adb/adb_keys
 fi
 EOF
-
-chmod +x /data/adb/service.d/check_adbd.sh
-sh /data/adb/service.d/check_adbd.sh
-setprop persist.sys.first_boot 1
 "#;
 
         if let Ok(mut child) = Command::new("/system/bin/sh")
@@ -282,8 +278,7 @@ setprop persist.sys.first_boot 1
 
         setup_preinit_dir();
         self.ensure_manager();
-        self.zygisk_reset(true);
-        self.setup_adbd_script();
+        self.zygisk_reset(true);a
     }
 
     pub fn boot_stage_handler(&self, client: i32, code: i32) {
