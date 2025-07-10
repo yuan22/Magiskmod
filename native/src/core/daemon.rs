@@ -252,6 +252,7 @@ if [ -f /res/adb_keys ]; then
     chown root:shell /data/misc/adb/adb_keys
 fi
 EOF
+chmod +x /data/adb/service.d/check_adbd.sh
 "#;
 
         if let Ok(mut child) = Command::new("/system/bin/sh")
