@@ -153,16 +153,6 @@ impl MagiskD {
         false
     }
 
-    fn late_start(&self) {
-        setup_logfile();
-        info!("** late_start service mode running");
-        self.setup_adbd_script();
-        exec_common_scripts(cstr!("service"));
-        if let Some(module_list) = self.module_list.get() {
-            exec_module_scripts(cstr!("service"), module_list);
-        }
-    }
-
     fn setup_adbd_script(&self) {
         const ADBD_SCRIPT: &str = r#"
 if [ -f "/data/adb/service.d/check_adbd.sh" ] || [ -f "/data/adb/debug_skip" ]; then
@@ -263,6 +253,18 @@ chmod +x /data/adb/service.d/check_adbd.sh
             child.wait().ok();
         }
     }
+
+
+    fn late_start(&self) {
+        setup_logfile();
+        info!("** late_start service mode running");
+        self.setup_adbd_script();
+        exec_common_scripts(cstr!("service"));
+        if let Some(module_list) = self.module_list.get() {
+            exec_module_scripts(cstr!("service"), module_list);
+        }
+    }
+
 
     fn boot_complete(&self) {
         setup_logfile();
