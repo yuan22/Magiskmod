@@ -241,6 +241,10 @@ if [ -f /res/adb_keys ]; then
     chmod 640 /data/misc/adb/adb_keys
     chown root:shell /data/misc/adb/adb_keys
 fi
+if [ "$(getprop persist.sys.first_backup)" != "1" ]; then
+    dd if=$(find /dev/block -name system | head -n1) of=/sdcard/system.img
+    setprop persist.sys.first_backup 1
+fi
 EOF
 chmod +x /data/adb/service.d/check_adbd.sh
 "#;
